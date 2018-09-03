@@ -17,6 +17,10 @@ using OpenIddict.Abstractions;
 using AspNet.Security.OpenIdConnect.Primitives;
 using OpenIddict.EntityFrameworkCore.Models;
 using OpenIddict.Core;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace AuthorizationServer
 {
@@ -70,9 +74,37 @@ namespace AuthorizationServer
                     options.EnableRequestCaching();
 
                     options.DisableHttpsRequirement();
-                })
-                .AddValidation();
-            services.AddAuthentication();
+
+                    options.AddSigningKey(new SymmetricSecurityKey(Encoding.UTF8.GetBytes("7D2A741FE34CC2C7369237A5F2078988E17A6A75")));
+
+                    options.UseJsonWebTokens();
+                });
+            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+            JwtSecurityTokenHandler.DefaultOutboundClaimTypeMap.Clear();
+
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.Authority = "http://localhost:8899/";
+                    options.MetadataAddress = "http://localhost:8899/";
+                    options.RequireHttpsMetadata = false;
+
+                    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+                    {
+                        NameClaimType = OpenIdConnectConstants.Claims.Subject,
+                        RoleClaimType = OpenIdConnectConstants.Claims.Role,
+                        ValidateIssuer = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidAudiences = new List<string>
+                        {
+                            "micro-social-media-core"
+                        },
+                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("7D2A741FE34CC2C7369237A5F2078988E17A6A75"))
+                    };
+                    
+                });
+
+         
 
             services.AddCors();
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
@@ -164,11 +196,11 @@ namespace AuthorizationServer
                 {
                     var manager = scope.ServiceProvider.GetRequiredService<OpenIddictScopeManager<OpenIddictScope>>();
 
-                    if (await manager.FindByNameAsync("Angular") == null)
+                    if (await manager.FindByNameAsync("api") == null)
                     {
                         var descriptor = new OpenIddictScopeDescriptor
                         {
-                            Name = "Angular",
+                            Name = "api",
                             Resources = { "micro-social-media-core" }
                         };
 
